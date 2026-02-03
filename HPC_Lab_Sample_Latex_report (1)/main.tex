@@ -1,0 +1,276 @@
+\documentclass[article, 11pt]{article}
+\usepackage{comment} % enables the use of multi-line comments (\ifx \fi) 
+\usepackage{lipsum} %This package just generates Lorem Ipsum filler text. 
+\usepackage{fullpage} % changes the margin
+\usepackage{graphicx}
+\usepackage{siunitx}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{multicol,caption}
+\usepackage{wrapfig}
+\usepackage[T1]{fontenc}
+\usepackage{setspace} 
+\usepackage{float}
+
+% \graphicspath{ {./images/} }
+\newenvironment{Figure}
+ {\par\medskip\noindent\minipage{\linewidth}}
+ {\endminipage\par\medskip}
+%\setmarginsrb{1 cm}{0.7 cm}{1 cm}{1.5 cm}{1 cm}{0.5 cm}{0.5 cm}{1 cm}
+
+\begin{document}
+
+\title{
+    \begin{spacing}{0.1}
+        \rule{\textwidth}{0.5pt}
+        \rule{\textwidth}{0.5pt}
+    \end{spacing}
+    \vspace{1cm}
+    \Huge\textbf{CS 301 \\High-Performance Computing}
+    \vspace{0.7cm}
+    \begin{spacing}{0.1}
+        \rule{\textwidth}{0.5pt}
+        \rule{\textwidth}{0.5pt}
+    \end{spacing}
+
+    \vspace{6cm}
+    \begin{center}
+    {\Huge{\; \underline{Lab 01 - CPU architecture, Triad and}}}
+    % \hfill \break
+    {\Huge{\; \underline{Measuring Performance}}}
+    % {\large{Problem A-1: PI\_TRAPEZOIDAL}}
+    \end{center}
+    
+}
+
+\author{
+    \vspace{5cm}
+    \Large{
+    \\Vraj Gandhi (202201425)
+    \\Kaushik Prajapati (202201472)
+    }
+}
+
+\maketitle
+
+\newpage
+\tableofcontents
+
+%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\section{Introduction}
+
+In this lab, we will measure the CPU performance of both our Lab PC and the Cluster. We will also study the system architecture by implementing the vector triad code and its variations: copy, scale, and sum. These operations were discussed in our theory class, and now we will test them in practice to understand their impact on performance.
+\section{Hardware Details}
+
+\subsection{Hardware Details for LAB207 PCs}
+\begin{itemize}
+    \item Architecture:          x86\_64
+\item CPU op-mode(s):        32-bit, 64-bit
+\item Byte Order:            Little Endian
+\item CPU(s):                12
+\item On-line CPU(s) list:   0-11
+\item Thread(s) per core:    2
+\item Core(s) per socket:    6
+\item Socket(s):             1
+\item NUMA node(s):          1
+\item Vendor ID:             GenuineIntel
+\item CPU family:            6
+\item Model:                 151
+\item Model name:            12th Gen Intel(R) Core(TM) i5-12500
+\item Stepping:              5
+\item CPU max MHz:           4600.0000
+\item CPU min MHz:           800.0000
+\item BogoMIPS:              5990.40
+\item Virtualization:        VT-x
+\item L1d cache:             288K
+\item L1i cache:             192K
+\item L2 cache:              7.5M
+\item L3 cache:              18M
+\item NUMA node0 CPU(s):     0-11
+\item Flags: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant\_tsc arch\_perfmon pebs bts rep\_good nopl xtopology nonstop\_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds\_cpl vmx smx est tm2 ssse3 fma cx16 xtpr pdcm pcid sse4\_1 sse4\_2 x2apic movbe popcnt tsc\_deadline\_timer aes xsave avx f16c rdrand lahf\_lm abm epb invpcid\_single tpr\_shadow vnmi flexpriority ept vpid fsgsbase tsc\_adjust bmi1 avx2 smep bmi2 erms invpcid xsaveopt dtherm ida arat pln pts
+\end{itemize}
+
+\subsection{Hardware Details for HPC Cluster (Node gics1)}
+\begin{itemize}
+    \item Architecture:          x86\_64
+\item CPU op-mode(s):        32-bit, 64-bit
+\item Byte Order:            Little Endian
+\item CPU(s):                16
+\item On-line CPU(s) list:   0-15
+\item Thread(s) per core:    1
+\item Core(s) per socket:    8
+\item Socket(s):             2
+\item NUMA node(s):          2
+\item Vendor ID:             GenuineIntel
+\item CPU family:            6
+\item Model:                 63
+\item Model name:            Intel(R) Xeon(R) CPU E5-2640 v3 @ 2.60GHz
+\item Stepping:              2
+\item CPU MHz:               1288.726
+\item BogoMIPS:              5204.73
+\item Virtualization:        VT-x
+\item L1d cache:             32K
+\item L1i cache:             32K
+\item L2 cache:              256K
+\item L3 cache:              20480K
+\item NUMA node0 CPU(s):     0-7
+\item NUMA node1 CPU(s):     8-15
+
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%
+\section{Problem Description}
+In this lab, we aim to measure the CPU performance of both the Lab PC and the Cluster by running the Stream Benchmark. This benchmark evaluates memory bandwidth using four operations: Copy, Scale, Sum, and Triad. These operations involve reading and writing large arrays, and their performance is limited by memory bandwidth rather than computational power.\\ \\
+To analyze performance, we measured throughput (GB/s) vs. problem size and FLOPs vs. problem size for each operation. The results were plotted separately for the Lab PC and the Cluster, producing a total of 16 graphs.
+
+\section{Benchmarking Methodology}
+We executed the operations on both the Lab PC and the Cluster, measuring:
+\begin{itemize}
+  \item Execution time for varying problem sizes.
+  \item Throughput (GB/s) and FLOPs for each operation.
+  \item Differences in performance between the Lab PC and the Cluster.
+\end{itemize}
+\\
+For each case, we generated plots of:
+\begin{itemize}
+  \item Throughput (Bytes/s) vs. Problem Size 
+  \\
+  $$ Throughput = \frac{sizeof(double) * N * Total}{alg\_time } $$
+   \\ where, N is the number of vectors used in algorithm,
+  \item FLOPs vs. Problem Size 
+  \\
+   $$ FLOPs = \frac{M * Total}{alg\_time } $$
+   \\ where, M is the number of floating point operations in single operation.
+\end{itemize}
+
+\newpage
+\section{Graphical Results}
+\subsection{Vector Copy Operation : $a[i] = b[i]$}
+
+\subsubsection{Throughput and FLOPs using Lab PC}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/copy_throughput_labpc.png}
+    \caption{Throughput vs. Problem Size for the vector copy operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/copy_flops_labpc.png}
+    \caption{FLOPs vs. Problem Size for the vector copy operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+
+\subsubsection{Throughput and FLOPs using HPC Cluster}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/copy_throughput_cluster.png}
+    \caption{Throughput vs. Problem Size for the vector copy operation using HPC Cluster.}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/copy_flops_cluster.png}
+    \caption{FLOPs vs. Problem Size for the vector copy operation using HPC Cluster.}
+    \label{fig:enter-label}
+\end{figure}
+
+\subsection{Vector Scaling Operation : $a[i] = k * b[i]$}
+\subsubsection{Throughput and FLOPs using Lab PC}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/scale_throughput_labpc.png}
+    \caption{Throughput vs. Problem Size for the vector scaling operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/scale_flops_labpc.png}
+    \caption{FLOPs vs. Problem Size for the vector scaling operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+
+\subsubsection{Throughput and FLOPs using HPC Cluster}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/scale_throughput_cluster.png}
+    \caption{Throughput vs. Problem Size for the vector triad operation using HPC Cluster}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/scale_flops_cluster.png}
+    \caption{FLOPs vs. Problem Size for the vector triad operation using HPC Cluster.}
+    \label{fig:enter-label}
+\end{figure}
+
+\subsection{Vector Sum Operation : $a[i] = b[i] + c[i]$}
+\subsubsection{Throughput and FLOPs using Lab PC}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/sum_throughput_labpc.png}
+    \caption{Throughput vs. Problem Size for the vector sum operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/sum_flops_labpc.png}
+    \caption{FLOPs vs. Problem Size for the vector sum operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+\subsubsection{Throughput and FLOPs using HPC Cluster}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/sum_throughput_cluster.png}
+    \caption{Throughput vs. Problem Size for the vector sum operation using HPC Cluster}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/sum_flops_cluster.png}
+    \caption{FLOPs vs. Problem Size for the vector sum operation using HPC Cluster.}
+    \label{fig:enter-label}
+\end{figure}
+
+\subsection{Vector Triad Operation : $a[i] = b[i] + c[i]*d[i]$}
+\subsubsection{Throughput and FLOPs using Lab PC}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/triad_throughput_labpc.png}
+    \caption{Throughput vs. Problem Size for the vector triad operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/triad_flops_labpc.png}
+    \caption{FLOPs vs. Problem Size for the vector triad operation using Lab PC.}
+    \label{fig:enter-label}
+\end{figure}
+
+\subsubsection{Throughput and FLOPs using HPC Cluster}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/triad_throughput_cluster.png}
+    \caption{Throughput vs. Problem Size for the vector triad operation using HPC Cluster.}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Results/triad_flops_cluster.png}
+    \caption{FLOPs vs. Problem Size for the vector triad operation using HPC Cluster.}
+    \label{fig:enter-label}
+\end{figure}
+
+\newpage
+\section{Conclusion}
+We tested all four operations on the Lab PC as well as HPC cluster. Performance was stable for small problem sizes but dropped as the size increased. This drop happens because memory bandwidth becomes a bottleneck. The system performs well in computing, but memory access slows it down. The actual performance is lower than the theoretical peak due to these memory limits. A sudden large drop in performance likely means the problem size exceeded a cache limit, forcing slower memory access.
+\end{document}
